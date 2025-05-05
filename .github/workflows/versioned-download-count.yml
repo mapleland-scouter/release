@@ -2,8 +2,8 @@ name: Update Per-Version Download Counts
 
 on:
   schedule:
-    - cron: "*/5 * * * *"  # 5분마다 실행
-  workflow_dispatch:        # 수동 실행도 허용
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -19,19 +19,19 @@ jobs:
       - name: Generate badge JSONs and README table
         run: |
           mkdir -p .github/badges
-          touch .github/badges/.commit_if_changed
+          > .github/badges/.commit_if_changed
 
           releases=$(curl -s https://api.github.com/repos/mapleland-scouter/release/releases)
           total=0
 
-          # 버전별 다운로드 수 수집 + 정렬
           echo "$releases" | jq '[.[] | { tag: .tag_name, count: ([.assets[] | select(.name | endswith(".exe")) | .download_count] | add) }] | sort_by(.tag | sub("^v"; "") | split(".") | map(tonumber)) | reverse' > versions.json
 
           badge_table="| 버전 | 다운로드 수 | 릴리즈 링크 |\n|------|--------------|---------------|"
-
           latest_tag=$(jq -r '.[0].tag' versions.json)
 
-          jq -c '.[]' versions.json | while read version; do
+          mapfile -t versions < <(jq -c '.[]' versions.json)
+
+          for version in "${versions[@]}"; do
             TAG=$(echo "$version" | jq -r '.tag')
             COUNT=$(echo "$version" | jq -r '.count')
             total=$((total + COUNT))
