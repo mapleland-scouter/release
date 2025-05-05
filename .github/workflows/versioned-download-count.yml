@@ -1,0 +1,51 @@
+name: Update Per-Version Download Counts
+
+on:
+  schedule:
+    - cron: "*/3 * * * *"  # 매 5분마다 실행
+  workflow_dispatch:
+
+jobs:
+  generate-versioned-badges:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Fetch releases and generate badge JSONs
+        run: |
+          mkdir -p .github/badges
+          CHANGED=false
+
+          curl -s https://api.github.com/repos/mapleland-scouter/release/releases | jq -c '.[]' | while read release; do
+            TAG=$(echo "$release" | jq -r '.tag_name')
+            COUNT=$(echo "$release" | jq '[.assets[] | select(.name | endswith(".exe")) | .download_count] | add')
+
+            FILE=".github/badges/${TAG}-downloads.json"
+            NEW_JSON=$(cat <<EOF
+{
+  "schemaVersion": 1,
+  "label": "${TAG} downloads",
+  "message": "${COUNT}",
+  "color": "blue"
+}
+EOF
+)
+
+            if [ ! -f "$FILE" ] || [ "$NEW_JSON" != "$(cat $FILE)" ]; then
+              echo "$NEW_JSON" > "$FILE"
+              CHANGED=true
+            fi
+          done
+
+          echo "CHANGED=$CHANGED" >> $GITHUB_ENV
+
+      - name: Commit badge JSONs if changed
+        if: env.CHANGED == 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .github/badges/*.json
+          git commit -m "Update versioned download badges"
+          git push
