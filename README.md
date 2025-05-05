@@ -6,8 +6,5 @@
 
 ## 📥 버전별 다운로드 수
 
-| 버전          | 다운로드 수                                                  | 릴리즈 링크                                                  |
-| ------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| `v1.0.5 BETA` | ![v1.0.5 Downloads](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/mapleland-scouter/release/main/.github/badges/v1.0.5-downloads.json) | [🔗 바로가기](https://github.com/mapleland-scouter/release/releases/tag/v1.0.5) |
-
-> 
+<!-- DOWNLOAD-TABLE-START -->
+<!-- DOWNLOAD-TABLE-END -->

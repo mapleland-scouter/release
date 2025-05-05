@@ -6,18 +6,20 @@ on:
   workflow_dispatch:
 
 jobs:
-  generate-versioned-badges:
+  update-download-badges-and-readme:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Fetch releases and generate badge JSONs
+      - name: Generate badge JSONs and README table
         run: |
           mkdir -p .github/badges
+          touch .github/badges/.commit_if_changed
 
           releases=$(curl -s https://api.github.com/repos/mapleland-scouter/release/releases)
+          badge_table="| 버전 | 다운로드 수 | 릴리즈 링크 |\n|------|--------------|---------------|"
 
           echo "$releases" | jq -c '.[]' | while read release; do
             TAG=$(echo "$release" | jq -r '.tag_name')
@@ -30,13 +32,28 @@ jobs:
               echo "$NEW_JSON" > "$FILE"
               touch .github/badges/.commit_if_changed
             fi
+
+            badge_url="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/mapleland-scouter/release/main/.github/badges/${TAG}-downloads.json"
+            release_url="https://github.com/mapleland-scouter/release/releases/tag/${TAG}"
+            badge_table="${badge_table}\n| \`${TAG}\` | ![${TAG}](${badge_url}) | [🔗 바로가기](${release_url}) |"
           done
 
-      - name: Commit badge JSONs if changed
-        if: exists('.github/badges/.commit_if_changed')
+          # replace download section in README.md (between custom markers)
+          START_MARKER="<!-- DOWNLOAD-TABLE-START -->"
+          END_MARKER="<!-- DOWNLOAD-TABLE-END -->"
+
+          awk "/$START_MARKER/{print; print \"\\n${badge_table}\\n\"; skip=1; next} /$END_MARKER/{skip=0} !skip" README.md > README.new.md
+          mv README.new.md README.md
+
+      - name: Commit badge and README if changed
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add .github/badges/*.json
-          git commit -m "Update versioned download badges"
-          git push
+
+          if [ -f ".github/badges/.commit_if_changed" ]; then
+            git add README.md .github/badges/*.json
+            git commit -m "Auto update badge and README"
+            git push
+          else
+            echo "No changes to commit."
+          fi
