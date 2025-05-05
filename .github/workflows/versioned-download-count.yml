@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  # ✅ git push 가능하게 함
+  contents: write  # git push 가능하게 설정
 
 jobs:
   update-download-badges-and-readme:
@@ -41,10 +41,8 @@ jobs:
             badge_table="${badge_table}\n| \`${TAG}\` | ![${TAG}](${badge_url}) | [🔗 바로가기](${release_url}) |"
           done
 
-          # badge_table을 중간 파일로 저장
           echo -e "$badge_table" > .github/badges/badge_table.md
 
-          # ✅ awk를 사용해 마커 안만 교체
           awk '
             BEGIN { in_table=0 }
             /<!-- DOWNLOAD-TABLE-START -->/ {
@@ -64,8 +62,16 @@ jobs:
 
           if [ -f ".github/badges/.commit_if_changed" ]; then
             git add README.md .github/badges/*.json
-            git commit -m "Auto update badge and README"
-            git push
+            if git diff --cached --quiet; then
+              echo "✅ 변경 없음: 커밋 생략"
+            else
+              git commit -m "Auto update badge and README"
+              git push
+            fi
           else
-            echo "No changes to commit."
+            echo "✅ 변화 없음: 스킵"
           fi
+
+      - name: Clean up temporary files
+        run: |
+          rm -f .github/badges/.commit_if_changed .github/badges/badge_table.md
