@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  
+  contents: write  # ✅ git push 허용
 
 jobs:
   update-download-badges-and-readme:
@@ -41,12 +41,18 @@ jobs:
             badge_table="${badge_table}\n| \`${TAG}\` | ![${TAG}](${badge_url}) | [🔗 바로가기](${release_url}) |"
           done
 
-          # replace download section in README.md (between custom markers)
-          START_MARKER="<!-- DOWNLOAD-TABLE-START -->"
-          END_MARKER="<!-- DOWNLOAD-TABLE-END -->"
+          # badge_table을 중간 파일로 저장
+          echo -e "$badge_table" > .github/badges/badge_table.md
 
-          awk "/$START_MARKER/{print; print \"\\n${badge_table}\\n\"; skip=1; next} /$END_MARKER/{skip=0} !skip" README.md > README.new.md
-          mv README.new.md README.md
+          # README 마커 영역만 치환
+          sed -i '/<!-- DOWNLOAD-TABLE-START -->/,/<!-- DOWNLOAD-TABLE-END -->/{
+            /<!-- DOWNLOAD-TABLE-START -->/{
+              p
+              r .github/badges/badge_table.md
+            }
+            /<!-- DOWNLOAD-TABLE-END -->/p
+            d
+          }' README.md
 
       - name: Commit badge and README if changed
         run: |
