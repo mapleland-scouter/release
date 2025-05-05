@@ -2,8 +2,8 @@ name: Update Per-Version Download Counts
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
-  workflow_dispatch:
+    - cron: "*/5 * * * *"  # 5분마다 실행
+  workflow_dispatch:        # 수동 실행도 허용
 
 permissions:
   contents: write
@@ -24,17 +24,14 @@ jobs:
           releases=$(curl -s https://api.github.com/repos/mapleland-scouter/release/releases)
           total=0
 
-          # 버전 → 다운로드 수 맵 저장용
+          # 버전별 다운로드 수 수집 + 정렬
           echo "$releases" | jq '[.[] | { tag: .tag_name, count: ([.assets[] | select(.name | endswith(".exe")) | .download_count] | add) }] | sort_by(.tag | sub("^v"; "") | split(".") | map(tonumber)) | reverse' > versions.json
-
-          # 버전 정렬
-          sort_versions() {
-            jq -r 'sort_by(.tag | sub("^v"; "") | split(".") | map(tonumber)) | reverse' versions.json
-          }
 
           badge_table="| 버전 | 다운로드 수 | 릴리즈 링크 |\n|------|--------------|---------------|"
 
-          sort_versions | jq -c '.[]' | while read version; do
+          latest_tag=$(jq -r '.[0].tag' versions.json)
+
+          jq -c '.[]' versions.json | while read version; do
             TAG=$(echo "$version" | jq -r '.tag')
             COUNT=$(echo "$version" | jq -r '.count')
             total=$((total + COUNT))
@@ -51,7 +48,7 @@ jobs:
             badge_url="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/mapleland-scouter/release/main/.github/badges/${TAG}-downloads.json"
             release_url="https://github.com/mapleland-scouter/release/releases/tag/${TAG}"
 
-            if [ "$TAG" = "$(sort_versions | jq -r '.[0].tag')" ]; then
+            if [ "$TAG" = "$latest_tag" ]; then
               badge_table="${badge_table}\n| **\`${TAG}\`** | ![${TAG}](${badge_url}) | [🔗 바로가기](${release_url}) |"
             else
               badge_table="${badge_table}\n| \`${TAG}\` | ![${TAG}](${badge_url}) | [🔗 바로가기](${release_url}) |"
