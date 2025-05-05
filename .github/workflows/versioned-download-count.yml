@@ -16,7 +16,6 @@ jobs:
       - name: Fetch releases and generate badge JSONs
         run: |
           mkdir -p .github/badges
-          CHANGED=false
 
           releases=$(curl -s https://api.github.com/repos/mapleland-scouter/release/releases)
 
@@ -29,14 +28,12 @@ jobs:
 
             if [ ! -f "$FILE" ] || [ "$NEW_JSON" != "$(cat $FILE 2>/dev/null)" ]; then
               echo "$NEW_JSON" > "$FILE"
-              CHANGED=true
+              touch .github/badges/.commit_if_changed
             fi
           done
 
-          echo "CHANGED=$CHANGED" >> $GITHUB_ENV
-
       - name: Commit badge JSONs if changed
-        if: env.CHANGED == 'true'
+        if: exists('.github/badges/.commit_if_changed')
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
