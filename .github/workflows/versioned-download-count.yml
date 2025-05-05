@@ -2,7 +2,7 @@ name: Update Per-Version Download Counts
 
 on:
   schedule:
-    - cron: "*/3 * * * *"  # 매 5분마다 실행
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -18,22 +18,16 @@ jobs:
           mkdir -p .github/badges
           CHANGED=false
 
-          curl -s https://api.github.com/repos/mapleland-scouter/release/releases | jq -c '.[]' | while read release; do
+          releases=$(curl -s https://api.github.com/repos/mapleland-scouter/release/releases)
+
+          echo "$releases" | jq -c '.[]' | while read release; do
             TAG=$(echo "$release" | jq -r '.tag_name')
             COUNT=$(echo "$release" | jq '[.assets[] | select(.name | endswith(".exe")) | .download_count] | add')
 
             FILE=".github/badges/${TAG}-downloads.json"
-            NEW_JSON=$(cat <<EOF
-{
-  "schemaVersion": 1,
-  "label": "${TAG} downloads",
-  "message": "${COUNT}",
-  "color": "blue"
-}
-EOF
-)
+            NEW_JSON=$(printf '{"schemaVersion":1,"label":"%s downloads","message":"%s","color":"blue"}' "$TAG" "$COUNT")
 
-            if [ ! -f "$FILE" ] || [ "$NEW_JSON" != "$(cat $FILE)" ]; then
+            if [ ! -f "$FILE" ] || [ "$NEW_JSON" != "$(cat $FILE 2>/dev/null)" ]; then
               echo "$NEW_JSON" > "$FILE"
               CHANGED=true
             fi
