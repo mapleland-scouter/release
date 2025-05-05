@@ -2,7 +2,7 @@ name: Update Per-Version Download Counts
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "0 * * * *"  # 1시간 주기
   workflow_dispatch:
 
 permissions:
