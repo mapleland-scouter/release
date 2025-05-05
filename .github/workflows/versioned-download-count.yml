@@ -2,11 +2,11 @@ name: Update Per-Version Download Counts
 
 on:
   schedule:
-    - cron: "*/5 * * * *"  # 매 5분마다 실행
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
-  contents: write  # git push 가능하게 설정
+  contents: write
 
 jobs:
   update-download-badges-and-readme:
@@ -22,27 +22,47 @@ jobs:
           touch .github/badges/.commit_if_changed
 
           releases=$(curl -s https://api.github.com/repos/mapleland-scouter/release/releases)
+          total=0
+
+          # 버전 → 다운로드 수 맵 저장용
+          echo "$releases" | jq -c '.[]' | jq '{ tag: .tag_name, count: ([.assets[] | select(.name | endswith(".exe")) | .download_count] | add) }' | jq -s '.' > versions.json
+
+          # 버전 정렬
+          sort_versions() {
+            jq -r 'sort_by(.tag | sub("^v"; "") | split(".") | map(tonumber)) | reverse' versions.json
+          }
+
           badge_table="| 버전 | 다운로드 수 | 릴리즈 링크 |\n|------|--------------|---------------|"
 
-          echo "$releases" | jq -c '.[]' | while read release; do
-            TAG=$(echo "$release" | jq -r '.tag_name')
-            COUNT=$(echo "$release" | jq '[.assets[] | select(.name | endswith(".exe")) | .download_count] | add')
+          sort_versions | jq -c '.[]' | while read version; do
+            TAG=$(echo "$version" | jq -r '.tag')
+            COUNT=$(echo "$version" | jq -r '.count')
+            total=$((total + COUNT))
 
             FILE=".github/badges/${TAG}-downloads.json"
-            NEW_JSON=$(printf '{"schemaVersion":1,"label":"%s downloads","message":"%s","color":"blue"}' "$TAG" "$COUNT")
+            OLD_COUNT=$(jq -r '.message' "$FILE" 2>/dev/null || echo "none")
 
-            if [ ! -f "$FILE" ] || [ "$NEW_JSON" != "$(cat $FILE 2>/dev/null)" ]; then
+            if [ "$COUNT" != "$OLD_COUNT" ]; then
+              NEW_JSON=$(printf '{"schemaVersion":1,"label":"%s downloads","message":"%s","color":"blue"}' "$TAG" "$COUNT")
               echo "$NEW_JSON" > "$FILE"
               touch .github/badges/.commit_if_changed
             fi
 
             badge_url="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/mapleland-scouter/release/main/.github/badges/${TAG}-downloads.json"
             release_url="https://github.com/mapleland-scouter/release/releases/tag/${TAG}"
-            badge_table="${badge_table}\n| \`${TAG}\` | ![${TAG}](${badge_url}) | [🔗 바로가기](${release_url}) |"
+
+            if [ "$TAG" = "$(sort_versions | jq -r '.[0].tag')" ]; then
+              badge_table="${badge_table}\n| **\`${TAG}\`** | ![${TAG}](${badge_url}) | [🔗 바로가기](${release_url}) |"
+            else
+              badge_table="${badge_table}\n| \`${TAG}\` | ![${TAG}](${badge_url}) | [🔗 바로가기](${release_url}) |"
+            fi
           done
 
-          echo -e "$badge_table" > .github/badges/badge_table.md
+          # 누적 다운로드 수 포함
+          header="> 📦 총 다운로드 수: **${total}회**\n"
+          echo -e "${header}\n${badge_table}" > .github/badges/badge_table.md
 
+          # README 갱신
           awk '
             BEGIN { in_table=0 }
             /<!-- DOWNLOAD-TABLE-START -->/ {
@@ -65,7 +85,7 @@ jobs:
             if git diff --cached --quiet; then
               echo "✅ 변경 없음: 커밋 생략"
             else
-              git commit -m "Auto update badge and README"
+              git commit -m "Auto update badge and README with totals"
               git push
             fi
           else
@@ -74,4 +94,4 @@ jobs:
 
       - name: Clean up temporary files
         run: |
-          rm -f .github/badges/.commit_if_changed .github/badges/badge_table.md
+          rm -f .github/badges/.commit_if_changed .github/badges/badge_table.md versions.json
